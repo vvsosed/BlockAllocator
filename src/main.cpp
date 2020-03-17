@@ -8,24 +8,25 @@
 #include "BlocksAllocator.h"
 #include "TimeProf.h"
 
-// Took this amazing code from https://codereview.stackexchange.com/questions/79612/c-ifying-a-capturing-lambda
 namespace
 {
 	std::default_random_engine generator(std::chrono::steady_clock::now().time_since_epoch().count());
 	std::uniform_int_distribution<std::size_t> dist( 1, 200 );
 
-	constexpr auto ARR_SIZE = 4 * 1024;
+	constexpr auto ARR_SIZE = 10;
 	std::array<int, ARR_SIZE> blocks;
 	std::array<void*, ARR_SIZE> pointers;
 } // private namespace
 
 
-void memoryTest( std::function<void*(std::size_t)> allocMemClbk, std::function<void( void* ptr )> freeMemClbk) {
-	for (auto i = 0; i < ARR_SIZE; ++i ) {
-		pointers[i] = allocMemClbk(blocks[i]);
-	}
-	for (auto i = 0; i < ARR_SIZE; ++i ) {
-		freeMemClbk(pointers[i]);
+void inline memoryTest( std::function<void*(std::size_t)> allocMemClbk, std::function<void( void* ptr )> freeMemClbk) {
+	for (auto i = 0; i < (16 * 1024); ++i) {
+		for (auto i = 0; i < ARR_SIZE; ++i ) {
+			pointers[i] = allocMemClbk(blocks[i]);
+		}
+		for (auto i = 0; i < ARR_SIZE; ++i ) {
+			freeMemClbk(pointers[i]);
+		}
 	}
 }
 
@@ -65,7 +66,9 @@ int main(int argc, char**argv) {
 		}
 		tProf.endMeasure();
 
-		tProf.tryPrintInfo();
+		if (tProf.tryPrintInfo()) {
+			common::blocks_allocator::printStat();
+		}
 	}
 
 	return 0;

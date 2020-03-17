@@ -71,12 +71,13 @@ public:
         ++m_updatesCount;
     }
 
-    void inline tryPrintInfo() {
+    bool inline tryPrintInfo() {
         if( m_printTp > ClockType::now() ) {
-            return;
+            return false;
         }
         printInfo();
         m_printTp = ClockType::now() + m_printDelay;
+        return true;
     }
 
     void inline printInfo() {
