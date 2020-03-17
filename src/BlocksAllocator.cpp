@@ -6,9 +6,10 @@
 #include <cstring>
 #include <array>
 #include <sstream>
-//#include "Ezlo.h"
 
 //#define COLLECT_STAT_INFO
+
+#define FAST_ALLOC
 
 #ifdef COLLECT_STAT_INFO
 #include <iostream>
@@ -96,16 +97,45 @@ struct BufArrayBase {
     }
 };
 
+#ifdef FAST_ALLOC
+template <typename Value, std::size_t Size>
+class FixedStack {
+public:
+	inline void push( Value value) {
+		m_array[m_index++] = value;
+	}
+
+	inline Value pop() {
+		return m_array[m_index--];
+	}
+
+	const inline std::size_t& count() const {
+		return m_index;
+	}
+
+private:
+	std::size_t m_index = 0;
+	std::array<Value, Size> m_array;
+};
+#endif
+
 template <size_t _Size, size_t _Count>
 struct StatBufArray : BufArrayBase {
     static constexpr auto Size = _Size;
     static constexpr auto Count = _Count;
 
+#ifdef FAST_ALLOC
+    typedef char Buffer[_Size];
+#else // FAST_ALLOC
     struct Buffer {
         char buf[Size];
         bool is_used;
     };
+#endif // FAST_ALLOC
     std::array<Buffer, Count> buffers;
+#ifdef FAST_ALLOC
+    FixedStack<Buffer*, _Count> m_pointers;
+#endif
 
     StatBufArray();
 
@@ -134,7 +164,13 @@ struct StatBufArray : BufArrayBase {
 
 template <size_t _Size, size_t _Count>
 StatBufArray<_Size, _Count>::StatBufArray()
-: buffers( {} ) {}
+: buffers( {} ) {
+#ifdef FAST_ALLOC
+	for( auto i = 0; i < _Count; ++i ) {
+		m_pointers.push(&buffers[i]);
+	}
+#endif
+}
 
 template <size_t _Size, size_t _Count>
 BufPtr StatBufArray<_Size, _Count>::alloc( const size_t _size ) {
@@ -143,21 +179,32 @@ BufPtr StatBufArray<_Size, _Count>::alloc( const size_t _size ) {
     }
 
     LockGuard guard( mutex );
+#ifdef FAST_ALLOC
+    return m_pointers.pop();
+#else  // FAST_ALLOC
     for( auto& buf : buffers ) {
         if( !buf.is_used ) {
             buf.is_used = true;
             used_count += 1;
 #ifdef COLLECT_STAT_INFO
             stat_info_data.onAlloc( *this, _size );
-#endif
+#endif // COLLECT_STAT_INFO
             return buf.buf;
         }
     }
+#endif // FAST_ALLOC
     return nullptr;
 }
 
 template <size_t _Size, size_t _Count>
 bool StatBufArray<_Size, _Count>::free( BufPtr _ptr ) {
+#ifdef FAST_ALLOC
+	if ( !isOwner(_ptr) ) {
+		return false;
+	}
+	m_pointers.push(static_cast<Buffer*>(_ptr));
+	return true;
+#else // FAST_ALLOC
     if( isEmpty() || buffers[0].buf > _ptr || buffers[Count - 1].buf < _ptr )
         return false;
 
@@ -172,11 +219,21 @@ bool StatBufArray<_Size, _Count>::free( BufPtr _ptr ) {
             return true;
         }
     }
+#endif // FAST_ALLOC
     return false;
 }
 
 template <size_t _Size, size_t _Count>
 bool StatBufArray<_Size, _Count>::isOwner( BufPtr _ptr ) {
+#ifdef FAST_ALLOC
+	if( isEmpty() || (void*)buffers[0] > _ptr || (void*)buffers[Count - 1] < _ptr ) {
+		return false;
+	}
+	//if ( 0 != size_t( _ptr - &buffers[0] ) % sizeof(Buffer) ) {
+	//	return false;
+	//}
+	return true;
+#else // FAST_ALLOC
     if( isEmpty() || buffers[0].buf > _ptr || buffers[Count - 1].buf < _ptr )
         return false;
 
@@ -184,6 +241,7 @@ bool StatBufArray<_Size, _Count>::isOwner( BufPtr _ptr ) {
         if( buf.buf == _ptr )
             return true;
     }
+#endif
     return false;
 }
 

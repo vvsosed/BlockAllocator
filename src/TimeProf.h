@@ -95,7 +95,7 @@ public:
                   << "s, CyclesAvgTime=" << cyclesAvgTime << "ms, Percent=" << usefulTimePercent << std::endl;
 
         for( const auto& itr : m_guards ) {
-            auto percent = double( itr.second.duration.count() * 100 ) / totalTime.count();
+            auto percent = double( itr.second.duration.count() * 100 ) / m_cyclesDuration.count();
             std::cout << "GuardName=" << itr.second.guardName << ", Percent=" << percent << std::endl;
         }
 
