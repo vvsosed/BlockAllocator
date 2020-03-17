@@ -8,23 +8,19 @@
 #include "BlocksAllocator.h"
 #include "TimeProf.h"
 
-// Took this amazing code from https://codereview.stackexchange.com/questions/79612/c-ifying-a-capturing-lambda
 namespace
 {
 	std::default_random_engine generator(std::chrono::steady_clock::now().time_since_epoch().count());
 	std::uniform_int_distribution<std::size_t> dist( 1, 200 );
 
-	constexpr auto ARR_SIZE = 20;
+	constexpr auto ARR_SIZE = 10;
 	std::array<int, ARR_SIZE> blocks;
 	std::array<void*, ARR_SIZE> pointers;
 } // private namespace
 
 
-void memoryTest( std::function<void*(std::size_t)> allocMemClbk, std::function<void( void* ptr )> freeMemClbk) {
-	for(auto step = 0; step < 10; ++step) {
-		for (auto i = 0; i < ARR_SIZE; ++i ) {
-			blocks[i] = dist(generator);
-		}
+void inline memoryTest( std::function<void*(std::size_t)> allocMemClbk, std::function<void( void* ptr )> freeMemClbk) {
+	for (auto i = 0; i < (16 * 1024); ++i) {
 		for (auto i = 0; i < ARR_SIZE; ++i ) {
 			pointers[i] = allocMemClbk(blocks[i]);
 		}
@@ -34,6 +30,13 @@ void memoryTest( std::function<void*(std::size_t)> allocMemClbk, std::function<v
 	}
 }
 
+void* dummyAlloc( const std::size_t _size ){
+	return nullptr;
+}
+
+bool dummyRelease( void* ptr ) {
+	// Nothing to do
+}
 
 int main(int argc, char**argv) {
 	std::cout << "Start test between BlockAllocator and Malloc" << std::endl;
@@ -41,8 +44,13 @@ int main(int argc, char**argv) {
 
 	auto baGuardId = tProf.initGuard("BlockA");
 	auto stGuardId = tProf.initGuard("Malloc");
+	auto dummyGuardId = tProf.initGuard("Dummy");
 
 	while(true) {
+		for (auto i = 0; i < ARR_SIZE; ++i ) {
+			blocks[i] = dist(generator);
+		}
+
 		tProf.beginMeasure();
 		{
 			auto guard = tProf.getGuard(baGuardId);
@@ -52,8 +60,15 @@ int main(int argc, char**argv) {
 			auto guard = tProf.getGuard(stGuardId);
 			memoryTest(std::malloc, std::free);
 		}
+		{
+			auto guard = tProf.getGuard(dummyGuardId);
+			memoryTest(dummyAlloc, dummyRelease);
+		}
 		tProf.endMeasure();
-		tProf.tryPrintInfo();
+
+		if (tProf.tryPrintInfo()) {
+			common::blocks_allocator::printStat();
+		}
 	}
 
 	return 0;

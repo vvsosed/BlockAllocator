@@ -6,9 +6,8 @@
 #include <cstring>
 #include <array>
 #include <sstream>
-//#include "Ezlo.h"
 
-//#define COLLECT_STAT_INFO
+#define COLLECT_STAT_INFO
 
 #ifdef COLLECT_STAT_INFO
 #include <iostream>

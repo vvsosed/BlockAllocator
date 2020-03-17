@@ -71,12 +71,13 @@ public:
         ++m_updatesCount;
     }
 
-    void inline tryPrintInfo() {
+    bool inline tryPrintInfo() {
         if( m_printTp > ClockType::now() ) {
-            return;
+            return false;
         }
         printInfo();
         m_printTp = ClockType::now() + m_printDelay;
+        return true;
     }
 
     void inline printInfo() {
@@ -95,7 +96,7 @@ public:
                   << "s, CyclesAvgTime=" << cyclesAvgTime << "ms, Percent=" << usefulTimePercent << std::endl;
 
         for( const auto& itr : m_guards ) {
-            auto percent = double( itr.second.duration.count() * 100 ) / totalTime.count();
+            auto percent = double( itr.second.duration.count() * 100 ) / m_cyclesDuration.count();
             std::cout << "GuardName=" << itr.second.guardName << ", Percent=" << percent << std::endl;
         }
 
